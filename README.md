@@ -30,29 +30,22 @@ implemented; the Apple MLX pilot runner is not the VM runner.
 
 ## Sync committed code to the VM
 
-This repository is local-only for now. A Git bundle transports its committed
-history without publishing a remote or copying model weights. After committing
-new work on `main`, run **on the local machine**:
+The public GitHub remote is
+[`muandet-lab/sc-math-experiments`](https://github.com/muandet-lab/sc-math-experiments).
+After committing new work on `main`, push it from the local machine with
+`git push origin main`. On the VM, clone once:
 
 ```sh
-git bundle create /tmp/sc-math-experiments.bundle main
-gcloud compute scp /tmp/sc-math-experiments.bundle sc-math-2xa100:~/sc-math-experiments.bundle \
-  --project=rg-muandet-15801-1 --zone=us-central1-f
+git clone https://github.com/muandet-lab/sc-math-experiments.git \
+  /mnt/scmath-data/src/sc-math-experiments
 ```
 
-For the first transfer, run **on the VM**:
+For later updates on the VM:
 
 ```sh
-git clone ~/sc-math-experiments.bundle /mnt/scmath-data/src/sc-math-experiments
+git -C /mnt/scmath-data/src/sc-math-experiments pull --ff-only origin main
 ```
 
-For later transfers, replace the bundle and run **on the VM**:
-
-```sh
-git -C /mnt/scmath-data/src/sc-math-experiments fetch ~/sc-math-experiments.bundle main
-git -C /mnt/scmath-data/src/sc-math-experiments merge --ff-only FETCH_HEAD
-```
-
-The fast-forward merge leaves VM-local edits alone and fails if the two copies
-diverge, so resolve that before continuing. Do not put API credentials or raw
-private evaluation items into Git.
+The fast-forward pull fails if VM-local edits conflict with the remote, so
+resolve that before continuing. Do not put API credentials or raw private
+evaluation items into Git.
