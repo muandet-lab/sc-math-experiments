@@ -30,22 +30,36 @@ implemented; the Apple MLX pilot runner is not the VM runner.
 
 ## Sync committed code to the VM
 
-The public GitHub remote is
-[`muandet-lab/sc-math-experiments`](https://github.com/muandet-lab/sc-math-experiments).
-After committing new work on `main`, push it from the local machine with
-`git push origin main`. On the VM, clone once:
+The intended public GitHub remote is
+[`muandet-lab/sc-math-experiments`](https://github.com/muandet-lab/sc-math-experiments),
+pending GitHub authentication and creation. Until then, transfer committed
+code as a Git bundle. On the local machine, after committing new work on
+`main`, run:
 
 ```sh
-git clone https://github.com/muandet-lab/sc-math-experiments.git \
+git bundle create /tmp/sc-math-experiments.bundle main
+gcloud compute scp /tmp/sc-math-experiments.bundle \
+  sc-math-2xa100:~/sc-math-experiments.bundle \
+  --project=rg-muandet-15801-1 --zone=us-central1-f \
+  --ssh-key-file=/Users/cispa/.ssh/id_ed25519
+```
+
+On the VM, clone once:
+
+```sh
+git clone ~/sc-math-experiments.bundle \
   /mnt/scmath-data/src/sc-math-experiments
 ```
 
-For later updates on the VM:
+For later bundle updates on the VM:
 
 ```sh
-git -C /mnt/scmath-data/src/sc-math-experiments pull --ff-only origin main
+git -C /mnt/scmath-data/src/sc-math-experiments fetch \
+  ~/sc-math-experiments.bundle main
+git -C /mnt/scmath-data/src/sc-math-experiments merge --ff-only FETCH_HEAD
 ```
 
-The fast-forward pull fails if VM-local edits conflict with the remote, so
-resolve that before continuing. Do not put API credentials or raw private
-evaluation items into Git.
+The fast-forward merge fails if VM-local edits conflict with the bundle, so
+resolve that before continuing. Once the GitHub remote exists, use normal
+`git push` locally and `git pull --ff-only` on the VM instead. Do not put API
+credentials or raw private evaluation items into Git.
