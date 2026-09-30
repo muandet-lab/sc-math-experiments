@@ -39,6 +39,25 @@ The runner resumes existing files; outputs and model weights are ignored by
 Git. The pilot is exploratory and its seed and outputs are excluded from the
 planned final evaluation.
 
+The bf16 A100 pilot uses the same five base problems and writes every raw
+response, including any thinking text, to JSONL. With the vLLM 0.30.0 CUDA 13
+environment on the VM, run one configuration at a time from the repository root:
+
+```sh
+export HF_HOME=/mnt/scmath-data/cache/huggingface
+CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_gpu_pilot \
+  qwen --mode non-thinking \
+  --output /mnt/scmath-data/outputs/qwen3-0.6b-bf16-nonthinking-pilot.jsonl
+CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_gpu_pilot \
+  olmo --mode native-thinking \
+  --output /mnt/scmath-data/outputs/olmo3-7b-think-bf16-pilot.jsonl
+```
+
+The runner resolves and records each official Hugging Face model commit before
+loading weights. It refuses to overwrite outputs. This is a functional pilot,
+not the pre-registered final study; its 20 matched renderings per model are
+insufficient for the planned hypothesis tests.
+
 The full-study multi-comparison and dose-response generators, checkpoint
 manifest, bf16 generation runners, and human QA specified in the action plan
 remain pending. The step-format accuracy pilot and corpus classifier validation

@@ -11,7 +11,8 @@ Verify the VM from a local terminal:
 
 ```sh
 gcloud compute ssh sc-math-2xa100 --project=rg-muandet-15801-1 \
-  --zone=us-central1-f --command='nvidia-smi && df -h /mnt/scmath-data'
+  --zone=us-central1-f --ssh-key-file=/Users/cispa/.ssh/id_ed25519 \
+  --command='nvidia-smi && df -h /mnt/scmath-data'
 ```
 
 Stop it after experiments to stop GPU compute billing:

@@ -24,9 +24,10 @@ python3 -m study.summarize_local_pilot
 
 `study/outputs/`, `study/private/`, virtual environments, and model weights
 are local artifacts ignored by Git. The pilot report is in
-[`study/local_pilot_report.md`](study/local_pilot_report.md). The full-study
-bf16 multi-GPU runner and corpus-association measurement are still to be
-implemented; the Apple MLX pilot runner is not the VM runner.
+[`study/local_pilot_report.md`](study/local_pilot_report.md). The exploratory
+bf16 VM pilot runner is `study.run_gpu_pilot`. The full-study multi-GPU runner
+and corpus-association measurement are still to be implemented; the Apple MLX
+pilot runner is not the VM runner.
 
 ## Sync committed code to the VM
 
@@ -47,7 +48,7 @@ gcloud compute scp /tmp/sc-math-experiments.bundle \
 On the VM, clone once:
 
 ```sh
-git clone ~/sc-math-experiments.bundle \
+git clone --branch main ~/sc-math-experiments.bundle \
   /mnt/scmath-data/src/sc-math-experiments
 ```
 
