@@ -59,3 +59,21 @@ instruction suggests a more robust shortcut. Incorrect abstention on complete
 or net-change controls indicates over-abstention. These outcomes cannot by
 themselves establish the internal cause or training origin. One sampled
 response per condition makes this an exploratory pilot.
+
+## Incremental instruction-placement Stage 1
+
+The next exploratory step reuses the original ten bases again. It adds only
+13 previously unobserved condition/placement cells per base (130 responses per
+model). The two new conditions are “has a box of [objects]” without a count
+and “has as many [objects] as Tom” without Tom's count. The vague-transfer
+condition is consistently “gives away some” for both models. Existing
+baseline and system-instruction results fill the other cells; explicit-unknown
+under instruction is omitted because both models were 10/10 at baseline.
+
+The user-placement treatment appends the exact same instruction quoted above
+to the end of the user message. The system-placement treatment appends it to
+the existing solve system prompt. This is a within-base exploratory comparison,
+not an independent confirmatory sample: old and new generations are single
+draws from stochastic models, and a condition that is already at ceiling
+cannot demonstrate instruction efficacy. Check that at least one marked
+condition has baseline failures before using it as a positive control.

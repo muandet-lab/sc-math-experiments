@@ -13,7 +13,7 @@ from study.generate_shortcut_cases import UNDETERMINED
 from study.run_shortcut_cases import (FINAL_MARKER, MODELS, PARSER_VERSION,
                                       parse_final_answer_detailed)
 
-SCORER_VERSION = 3
+SCORER_VERSION = 4
 SOLVE_SYSTEM = ("Solve carefully. End with one line beginning 'Final answer:' "
                 "followed by your actual result: a whole number, an expression "
                 "using x for an unknown quantity, or 'cannot be determined' as "
@@ -30,7 +30,7 @@ def _final_line(raw: str, finish_reason: str) -> tuple[str | None, str]:
     matches = list(FINAL_MARKER.finditer(content))
     if not matches:
         return None, "missing_final"
-    line = content[matches[-1].end():].split("\n", 1)[0].strip()
+    line = content[matches[-1].end():].lstrip("\r\n \t").split("\n", 1)[0].strip()
     return (line, "found_final") if line else (None, "invalid_final")
 
 
@@ -91,7 +91,8 @@ def grade(row: dict, raw: str, finish_reason: str) -> dict:
                 "classification": "correct_symbolic_underdetermined" if correct
                 else "other_error", "correct": correct,
                 "zero_equivalent_guess": False}
-    parsed, status = parse_final_answer_detailed(raw, finish_reason)
+    parsed, status = parse_final_answer_detailed(
+        "</think>Final answer: " + line, finish_reason)
     correct = parsed == row["answer"]
     if row["answer"] == UNDETERMINED:
         classification = ("correct_underdetermined" if correct else
@@ -105,17 +106,43 @@ def grade(row: dict, raw: str, finish_reason: str) -> dict:
                                       and parsed == row["symbolic_gold"][1])}
 
 
+def build_messages(items: list[dict],
+                   extra_system_instruction: str | None = None) -> list[list[dict]]:
+    messages = []
+    for item in items:
+        placement = item.get("instruction_placement")
+        if placement not in (None, "none", "system", "user"):
+            raise ValueError(f"Unknown instruction placement: {placement}")
+        instruction = item.get("instruction_text")
+        if placement in ("system", "user") and not instruction:
+            raise ValueError("Instruction placement requires instruction_text")
+        system = SOLVE_SYSTEM if item["task"] == "solve" else ANSWERABILITY_SYSTEM
+        if extra_system_instruction:
+            system += " " + extra_system_instruction
+        if placement == "system":
+            system += " " + instruction
+        user = item["problem"]
+        if placement == "user":
+            user += "\n\n" + instruction
+        messages.append([{"role": "system", "content": system},
+                         {"role": "user", "content": user}])
+    return messages
+
+
 def run(model_key: str, input_path: Path, output: Path,
         max_tokens: int = 4096, max_model_len: int = 8192,
         sampling_seed: int = 20260929,
         variants: tuple[str, ...] | None = None,
         extra_system_instruction: str | None = None,
-        revision: str | None = None) -> None:
+        revision: str | None = None,
+        items_override: list[dict] | None = None) -> None:
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite {output}")
     if max_tokens < 1 or max_model_len <= max_tokens:
         raise ValueError("max_model_len must exceed positive max_tokens")
-    items = load_items(input_path)
+    items = items_override if items_override is not None else load_items(input_path)
+    if not items:
+        raise ValueError("No diagnostic items")
     if variants is not None:
         if not variants or len(variants) != len(set(variants)):
             raise ValueError("variants must be nonempty and unique")
@@ -140,11 +167,7 @@ def run(model_key: str, input_path: Path, output: Path,
                 "max_tokens": max_tokens, "seed": sampling_seed}
     if model_key == "qwen":
         settings["top_k"] = 20
-    messages = [[{"role": "system", "content":
-                  (SOLVE_SYSTEM if item["task"] == "solve" else ANSWERABILITY_SYSTEM)
-                  + (" " + extra_system_instruction if extra_system_instruction else "")},
-                 {"role": "user", "content": item["problem"]}]
-                for item in items]
+    messages = build_messages(items, extra_system_instruction)
     engine = LLM(model=repository, revision=revision,
                  tokenizer_revision=revision, dtype="bfloat16",
                  tensor_parallel_size=1, max_model_len=max_model_len,
@@ -163,6 +186,7 @@ def run(model_key: str, input_path: Path, output: Path,
                       else "native-thinking", "vllm_version": vllm.__version__,
                       "torch_version": torch.__version__, "torch_cuda": torch.version.cuda,
                       "system_prompt": conversation[0]["content"],
+                      "user_prompt": conversation[1]["content"],
                       "extra_system_instruction": extra_system_instruction,
                       "chat_template_kwargs": template_kwargs,
                       "sampling": settings, "max_model_len": max_model_len,

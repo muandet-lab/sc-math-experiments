@@ -11,12 +11,65 @@ from unittest.mock import patch
 from study.generate_case5_diagnostics import VARIANTS, generate, validate_items
 from study.generate_shortcut_cases import UNDETERMINED
 from study.run_case5_assumption_pilot import INSTRUCTION, VARIANTS as ASSUMPTION_VARIANTS
-from study.run_case5_diagnostics import _affine, grade, run
+from study.run_case5_diagnostics import _affine, build_messages, grade, run
+from study.run_case5_instruction_stage1 import NEW_CELLS, build_items
 from study.summarize_case5_assumption_pilot import summarize as summarize_assumption
 from study.summarize_case5_diagnostics import summarize
+from study.summarize_case5_instruction_stage1 import summarize as summarize_stage1
 
 
 class Case5DiagnosticTests(unittest.TestCase):
+    def test_incremental_stage1_uses_same_bases_and_places_instruction(self):
+        source = generate(10, 20261003)
+        rows = build_items(source)
+        self.assertEqual(len(rows), 10 * len(NEW_CELLS))
+        self.assertEqual(len(NEW_CELLS), 13)
+        self.assertEqual(len({row["item_id"] for row in rows}), len(rows))
+        messages = build_messages(rows)
+        for row, conversation in zip(rows, messages):
+            self.assertEqual(conversation[0]["content"].endswith(INSTRUCTION),
+                             row["instruction_placement"] == "system")
+            self.assertEqual(conversation[1]["content"].endswith(INSTRUCTION),
+                             row["instruction_placement"] == "user")
+            if row["variant"] in ("box_solve", "tom_reference_solve"):
+                self.assertEqual(row["answer"], UNDETERMINED)
+                self.assertEqual(row["symbolic_gold"], [1, row["delta"]])
+            if row["variant"] == "missing_given_solve":
+                self.assertIn("gives away some", row["problem"])
+
+    def test_incremental_summary_joins_saved_and_new_cells(self):
+        source = generate(1, 20261003)
+        stage1 = build_items(source)
+        settings = {"temperature": 0.6, "top_p": 0.95,
+                    "max_tokens": 4096, "seed": 20260929, "top_k": 20}
+
+        def record(item, **extra):
+            answer = (item["answer"] if item["answer"] != UNDETERMINED
+                      else "cannot be determined")
+            return {**item, **extra, "model": "Qwen/Qwen3-0.6B",
+                    "revision": "test-revision", "sampling": settings,
+                    "max_model_len": 8192,
+                    "raw_response": f"</think>Final answer: {answer}",
+                    "finish_reason": "stop"}
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = [Path(directory) / f"{name}.jsonl"
+                     for name in ("baseline", "system", "stage1")]
+            old = [record(row) for row in source]
+            system = [record(row, extra_system_instruction=INSTRUCTION)
+                      for row in source if row["variant"] in ASSUMPTION_VARIANTS]
+            messages = build_messages(stage1)
+            new = [record(row, system_prompt=conversation[0]["content"],
+                          user_prompt=conversation[1]["content"])
+                   for row, conversation in zip(stage1, messages)]
+            for path, rows in zip(paths, (old, system, new)):
+                path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                summarize_stage1(*paths)
+            self.assertIn("bases=1", printed.getvalue())
+            self.assertIn("box_solve | 1/1/0/0", printed.getvalue())
+
     def test_generated_variants_keep_distinct_numbers_and_correct_gold(self):
         rows = generate(30, 615)
         self.assertEqual(rows, generate(30, 615))
@@ -61,6 +114,8 @@ class Case5DiagnosticTests(unittest.TestCase):
             (block["complete_solve"],
              f"Final answer: {block['complete_solve']['answer']}", "correct_numeric"),
             (block["unknown_delta_solve"], f"Final answer: +{delta}", "correct_numeric"),
+            (block["unknown_delta_solve"],
+             f"Final answer:\n\\boxed{{{delta}}}", "correct_numeric"),
             (block["missing_initial_answerability"], "Final answer: no",
              "correct_answerability"),
             (block["complete_answerability"], "Final answer: yes",

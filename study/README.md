@@ -233,3 +233,42 @@ python3 -m study.summarize_case5_assumption_pilot \
 
 See [case5_diagnostics_spec.md](case5_diagnostics_spec.md) for the intervention
 wording and interpretation limits.
+The local Qwen and OLMo follow-up results are documented in
+[case5_assumption_pilot_report.md](case5_assumption_pilot_report.md).
+
+### Incremental instruction-placement Stage 1
+
+This exploratory run adds only cells missing from the earlier two pilots on
+the **same ten bases**: the box and Tom-reference conditions, the
+“gives away some” condition with instruction, the user-message placement, and
+zero-start under instruction. It generates 130 responses per model, one per
+new cell and base. It pins the same revisions and generation settings. On the
+VM, after updating the checkout, run:
+
+```sh
+for model in qwen olmo; do
+  CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python \
+    -m study.run_case5_instruction_stage1 "$model" \
+    --input /mnt/scmath-data/outputs/case5-diagnostics-pilot-items.jsonl \
+    --output "/mnt/scmath-data/outputs/${model}-case5-instruction-stage1.jsonl" || break
+done
+```
+
+After copying the new files locally, summarize one model at a time using its
+original diagnostic file, its assumption-instruction file, and its Stage 1
+file. The summary prints `correct/total/predicted-error/other` counts for each of the
+three placements:
+
+```sh
+python3 -m study.summarize_case5_instruction_stage1 \
+  --baseline study/outputs/qwen-case5-diagnostics-pilot.jsonl \
+  --system study/qwen-case5-assumption-pilot.jsonl \
+  --stage1 study/qwen-case5-instruction-stage1.jsonl
+python3 -m study.summarize_case5_instruction_stage1 \
+  --baseline study/olmo-case5-diagnostics-pilot.jsonl \
+  --system study/olmo-case5-assumption-pilot.jsonl \
+  --stage1 study/olmo-case5-instruction-stage1.jsonl
+```
+
+The next confirmatory study would rerun the final grid on fresh bases with
+multiple samples per prompt; do not pool it with this exploratory Stage 1.
