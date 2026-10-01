@@ -4,7 +4,9 @@ __pycache__/
 .venv*/
 study/outputs/
 study/private/
-study/*.jsonl
-!study/case5_confirmatory_items.jsonl
-!study/case5_confirmatory_prefill.jsonl
+*.jsonl
+*.md
+!/README.md
+*.R
+study/case5_confirmatory_scorer_audit.json
 *.bundle

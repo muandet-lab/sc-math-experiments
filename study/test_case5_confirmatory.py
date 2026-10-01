@@ -19,7 +19,10 @@ class ConfirmatoryCase5Tests(unittest.TestCase):
         validate(items, probes)
         self.assertEqual(len(items), COUNT * 23)
         self.assertEqual(len(probes), COUNT * 2)
-        self.assertEqual(items, load_items(HERE / "case5_confirmatory_items.jsonl"))
+        with tempfile.TemporaryDirectory() as directory:
+            item_path = Path(directory) / "items.jsonl"
+            item_path.write_text("".join(json.dumps(item) + "\n" for item in items), encoding="utf-8")
+            self.assertEqual(items, load_items(item_path))
         first = {r["kind"]: r for r in items[:23]}
         self.assertEqual(first["complete"]["gold"], 16)
         self.assertEqual(first["zero_start"]["gold"], 5)
@@ -85,7 +88,9 @@ class ConfirmatoryCase5Tests(unittest.TestCase):
             (root / "fake.scored.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows))
             (root / "fake.prefill.jsonl").write_text("".join(json.dumps({"probe_id": p["probe_id"], "revision": "a" * 40,
                 "condition": p["condition"], "log_odds_zero_vs_received": 0}) + "\n" for p in probes))
-            metrics, conditions, regression = analyze(HERE / "case5_confirmatory_items.jsonl",
+            items_path = root / "items.jsonl"
+            items_path.write_text("".join(json.dumps(item) + "\n" for item in items), encoding="utf-8")
+            metrics, conditions, regression = analyze(items_path,
                                                        root / "models.json", root)
             self.assertEqual(metrics["fake"]["zero_default_rate"], 0)
             self.assertEqual(metrics["fake"]["over_abstention_rate"], 0)
