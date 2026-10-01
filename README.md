@@ -27,10 +27,9 @@ python3 -m study.summarize_gpu_pilot
 are local artifacts ignored by Git. The pilot reports are in
 [`study/local_pilot_report.md`](study/local_pilot_report.md) and
 [`study/gpu_pilot_report.md`](study/gpu_pilot_report.md). The exploratory
-bf16 VM pilot runner is `study.run_gpu_pilot`; the five remaining Qwen3 sizes
-have a thinking-only entry point in `study.run_qwen_scale_pilot`. The full-study
-multi-GPU runner and corpus-association measurement are still to be
-implemented; the Apple MLX pilot runner is not the VM runner.
+bf16 VM pilot runner is `study.run_gpu_pilot`. The full-study multi-GPU runner
+and corpus-association measurement are still to be implemented; the Apple MLX
+pilot runner is not the VM runner.
 
 ## Sync committed code to the VM
 

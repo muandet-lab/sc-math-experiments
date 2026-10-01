@@ -15,11 +15,6 @@ from study.run_local_pilot import MAX_STEPS, N_BASE, SEED, SYSTEM, extract_answe
 
 MODELS = {
     "qwen": "Qwen/Qwen3-0.6B",
-    "qwen1.7b": "Qwen/Qwen3-1.7B",
-    "qwen4b": "Qwen/Qwen3-4B",
-    "qwen8b": "Qwen/Qwen3-8B",
-    "qwen14b": "Qwen/Qwen3-14B",
-    "qwen32b": "Qwen/Qwen3-32B",
     "olmo": "allenai/Olmo-3-7B-Think",
 }
 
@@ -34,7 +29,7 @@ def pilot_items() -> list[dict]:
 
 
 def sampling_settings(model_key: str, mode: str) -> dict:
-    if model_key.startswith("qwen"):
+    if model_key == "qwen":
         if mode == "thinking":
             return {"temperature": 0.6, "top_p": 0.95, "top_k": 20,
                     "max_tokens": 2048, "seed": SEED}
@@ -49,10 +44,8 @@ def sampling_settings(model_key: str, mode: str) -> dict:
 def run(model_key: str, mode: str, output: Path) -> None:
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite {output}")
-    if model_key.startswith("qwen") and mode not in ("thinking", "non-thinking"):
+    if model_key == "qwen" and mode not in ("thinking", "non-thinking"):
         raise ValueError("Qwen mode must be thinking or non-thinking")
-    if model_key not in ("qwen", "olmo") and mode != "thinking":
-        raise ValueError("The remaining Qwen3 size pilots require thinking mode")
     settings = sampling_settings(model_key, mode)
 
     import torch
@@ -70,15 +63,11 @@ def run(model_key: str, mode: str, output: Path) -> None:
          {"role": "user", "content": item["problem"]}]
         for item in items
     ]
-    template_kwargs = {"enable_thinking": mode == "thinking"} if model_key.startswith("qwen") else None
-    tensor_parallel_size = 2 if model_key == "qwen32b" else 1
-    gpu_memory_utilization = 0.95 if model_key == "qwen32b" else 0.85
-    if torch.cuda.device_count() < tensor_parallel_size:
-        raise RuntimeError(f"{repository} requires {tensor_parallel_size} visible GPU(s)")
+    template_kwargs = {"enable_thinking": mode == "thinking"} if model_key == "qwen" else None
     engine = LLM(model=repository, revision=revision,
                  tokenizer_revision=revision, dtype="bfloat16",
-                 tensor_parallel_size=tensor_parallel_size, max_model_len=4096,
-                 gpu_memory_utilization=gpu_memory_utilization, seed=SEED)
+                 tensor_parallel_size=1, max_model_len=4096,
+                 gpu_memory_utilization=0.85, seed=SEED)
     responses = engine.chat(messages, SamplingParams(**settings),
                             chat_template_kwargs=template_kwargs)
     if len(responses) != len(items):
@@ -97,8 +86,6 @@ def run(model_key: str, mode: str, output: Path) -> None:
                 "problem": item["problem"], "answer": item["answer"],
                 "model": repository, "revision": revision,
                 "precision": "bf16", "mode": mode,
-                "tensor_parallel_size": tensor_parallel_size,
-                "gpu_memory_utilization": gpu_memory_utilization,
                 "vllm_version": vllm.__version__,
                 "torch_version": torch.__version__,
                 "torch_cuda": torch.version.cuda,

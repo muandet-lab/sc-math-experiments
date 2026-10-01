@@ -66,32 +66,6 @@ outputs to `study/outputs/` locally, recompute its table with:
 python3 -m study.summarize_gpu_pilot
 ```
 
-To extend the same 20-item exploratory pilot to the five remaining Qwen3
-sizes, use `study.run_qwen_scale_pilot`. It fixes `enable_thinking=True` and
-the Qwen thinking sampling settings for every size. Each command writes a
-separate JSONL file and refuses to overwrite an existing one. Run them from
-the VM repository root after syncing the latest code:
-
-```sh
-export HF_HOME=/mnt/scmath-data/cache/huggingface
-CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_qwen_scale_pilot 1.7b --output-dir /mnt/scmath-data/outputs
-CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_qwen_scale_pilot 4b --output-dir /mnt/scmath-data/outputs
-CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_qwen_scale_pilot 8b --output-dir /mnt/scmath-data/outputs
-CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_qwen_scale_pilot 14b --output-dir /mnt/scmath-data/outputs
-CUDA_VISIBLE_DEVICES=0,1 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.run_qwen_scale_pilot 32b --output-dir /mnt/scmath-data/outputs
-```
-
-The 32B run uses tensor parallelism across the two 40 GB A100s and sets
-vLLM's GPU memory utilization to 0.95; the other four use one GPU at 0.85.
-This is a proposed pilot configuration, not a validated capacity claim: the
-32B run still needs an actual startup and generation check on the VM.
-All five runs use bf16, `max_model_len=4096`, 2,048 output tokens, and the
-same selected five bases as the earlier pilot. The results therefore assess
-this short pilot only; they do not implement the 500-base primary set or its
-registered 16,384-token thinking limit. After copying the outputs locally,
-pass their paths to `python3 -m study.summarize_gpu_pilot` to inspect the
-per-cell accuracy and truncations.
-
 The full-study multi-comparison and dose-response generators, checkpoint
 manifest, bf16 generation runners, and human QA specified in the action plan
 remain pending. The step-format accuracy pilot and corpus classifier validation
