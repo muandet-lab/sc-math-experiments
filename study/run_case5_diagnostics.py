@@ -13,7 +13,7 @@ from study.generate_shortcut_cases import UNDETERMINED
 from study.run_shortcut_cases import (FINAL_MARKER, MODELS, PARSER_VERSION,
                                       parse_final_answer_detailed)
 
-SCORER_VERSION = 1
+SCORER_VERSION = 2
 SOLVE_SYSTEM = ("Solve carefully. End with one line beginning 'Final answer:' "
                 "followed by your actual result: a whole number, an expression "
                 "using x for an unknown quantity, or 'cannot be determined' as "
@@ -70,8 +70,9 @@ def grade(row: dict, raw: str, finish_reason: str) -> dict:
                 "classification": "truncation" if finish_reason == "length" else "other_error",
                 "correct": False, "zero_equivalent_guess": False}
     if row["task"] == "answerability":
-        tokens = re.findall(r"(?i)\b(?:yes|no)\b", line)
-        answer = tokens[0].lower() if len(tokens) == 1 else None
+        leading = re.match(r"(?i)^[\s*$]*\b(yes|no)\b", line)
+        contradictory = re.search(r"(?i)\b(?:or|but|maybe)\s+(?:yes|no)\b", line)
+        answer = leading.group(1).lower() if leading and not contradictory else None
         correct = answer == row["answer"]
         return {"parsed_answer": answer,
                 "parse_status": "parsed_answerability" if answer else "invalid_final",

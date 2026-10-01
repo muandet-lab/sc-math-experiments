@@ -163,8 +163,12 @@ different prompts and token limits and should be reported separately.
 [case5_diagnostics_spec.md](case5_diagnostics_spec.md) describes three tests of
 missing-number location, implicit versus explicit unknowns, and ordinary
 solving versus answerability assessment. The nine variants of each base problem
-are independent single-turn conversations. For an exploratory 10-base pilot on
-the VM, use a seed that will not be reused for later evaluation:
+are independent single-turn conversations.
+The first Qwen result and its scorer correction are recorded in
+[case5_diagnostics_pilot_report.md](case5_diagnostics_pilot_report.md).
+
+For an exploratory 10-base pilot on the VM, use a seed that will not be
+reused for later evaluation:
 
 ```sh
 /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.generate_case5_diagnostics \

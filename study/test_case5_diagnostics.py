@@ -59,6 +59,9 @@ class Case5DiagnosticTests(unittest.TestCase):
              "correct_answerability"),
             (block["complete_answerability"], "Final answer: yes",
              "correct_answerability"),
+            (block["complete_answerability"],
+             "Final answer: yes. No other scenario changes the result.",
+             "correct_answerability"),
         )
         for row, answer, category in cases:
             with self.subTest(variant=row["variant"], answer=answer):
