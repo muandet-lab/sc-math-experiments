@@ -20,7 +20,7 @@ counts divisible by four give exact balance. All quantities stay between
 templates.
 
 Run the local checks with
-`python3 -m unittest study.test_generate study.test_local_pilot study.test_shortcut_cases`.
+`python3 -m unittest study.test_generate study.test_local_pilot study.test_shortcut_cases study.test_case5_diagnostics`.
 
 An exploratory local pilot uses five base problems of at most three steps,
 each in verbal direct, verbal reversal, symbolic direct, and symbolic reversal
@@ -157,3 +157,39 @@ reason. After copying the files locally, run the summarizer on the new paths.
 It reports `unparsed_completed` separately from `truncations`; inspect those
 rows before interpreting the accuracy gap. The first and second pilots have
 different prompts and token limits and should be reported separately.
+
+## Case-5 behavioral diagnostics
+
+[case5_diagnostics_spec.md](case5_diagnostics_spec.md) describes three tests of
+missing-number location, implicit versus explicit unknowns, and ordinary
+solving versus answerability assessment. The nine variants of each base problem
+are independent single-turn conversations. For an exploratory 10-base pilot on
+the VM, use a seed that will not be reused for later evaluation:
+
+```sh
+/mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.generate_case5_diagnostics \
+  --count 10 --seed 20261003 \
+  --output /mnt/scmath-data/outputs/case5-diagnostics-pilot-items.jsonl
+for model in qwen olmo; do
+  CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python \
+    -m study.run_case5_diagnostics "$model" \
+    --input /mnt/scmath-data/outputs/case5-diagnostics-pilot-items.jsonl \
+    --output "/mnt/scmath-data/outputs/${model}-case5-diagnostics-pilot.jsonl" || break
+done
+```
+
+The diagnostic runner defaults to `--max-tokens 4096 --max-model-len 8192`,
+uses one visible A100 40 GB GPU with `gpu_memory_utilization=0.85`, and records
+the limits in each output row. These are the saved pilot settings, not a known
+GPU maximum. If many responses still truncate, test `--max-tokens 8192
+--max-model-len 16384` on a small set first and use new output filenames.
+After copying response files locally, summarize them with:
+
+```sh
+python3 -m study.summarize_case5_diagnostics \
+  study/outputs/*-case5-diagnostics-pilot.jsonl
+```
+
+Inspect raw completed errors before drawing a mechanism conclusion. For a
+generalization run, generate new base problems with a fresh private seed and
+freeze the prompt, limits, model revisions, and scoring rules before inference.
