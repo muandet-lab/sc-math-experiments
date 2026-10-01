@@ -6,6 +6,9 @@ thinking-only vLLM runner is `run_shortcut_cases.py`. This is exploratory
 design work and is not a frozen pre-registration. Use a fresh private seed
 for any later evaluation set, then freeze the generator revision, sample
 sizes, models, prompts, decoding settings, and analysis before running it.
+The earlier `study.generate` pilot mixed additive and multiplicative
+comparisons, so its aggregate results are not an additive-only case-1
+baseline. Case 2 here isolates multiplication and division.
 
 Each case is generated as a pair with one intended manipulation and an
 independently stored gold response. `--count N` yields `2N` prompts. Agent
