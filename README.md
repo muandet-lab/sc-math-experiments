@@ -38,25 +38,25 @@ GPU runner documented in [study/README.md](study/README.md).
 
 ## Sync committed code to the VM
 
-The GitHub remote is
+The public GitHub remote is
 [`muandet-lab/sc-math-experiments`](https://github.com/muandet-lab/sc-math-experiments).
 From the local checkout, commit changes and run `git push origin main`.
 The raw pilot response JSONL files remain local; the generated confirmatory
 benchmark and prefill JSONL files are tracked intentionally.
 
-For an existing VM checkout, authenticate GitHub on the VM once, then add the
-remote and fast-forward to the latest commit:
+For the existing VM checkout, replace the old bundle remote and fast-forward
+to the latest commit:
 
 ```sh
-gh auth login -h github.com -p https -w
-gh auth setup-git
-git -C /mnt/scmath-data/src/sc-math-experiments remote add origin \
+git -C /mnt/scmath-data/src/sc-math-experiments remote set-url origin \
   https://github.com/muandet-lab/sc-math-experiments.git
 git -C /mnt/scmath-data/src/sc-math-experiments fetch origin
 git -C /mnt/scmath-data/src/sc-math-experiments merge --ff-only origin/main
 ```
 
-If the VM checkout already has `origin`, skip `remote add`. For later updates,
-run `git -C /mnt/scmath-data/src/sc-math-experiments pull --ff-only origin main`.
-Commit or stash VM-local edits before pulling. Keep API credentials, model
-weights, and raw response files out of Git.
+For later updates, run
+`git -C /mnt/scmath-data/src/sc-math-experiments pull --ff-only origin main`.
+The public repository needs no authentication for pulls. Authenticate with
+`gh auth login -h github.com -p https -w` and `gh auth setup-git` on the VM
+only if it needs to push. Commit or stash VM-local edits before pulling. Keep
+API credentials, model weights, and raw response files out of Git.
