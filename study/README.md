@@ -164,7 +164,7 @@ different prompts and token limits and should be reported separately.
 missing-number location, implicit versus explicit unknowns, and ordinary
 solving versus answerability assessment. The nine variants of each base problem
 are independent single-turn conversations.
-The first Qwen result and its scorer correction are recorded in
+The Qwen and OLMo results and scorer corrections are recorded in
 [case5_diagnostics_pilot_report.md](case5_diagnostics_pilot_report.md).
 
 For an exploratory 10-base pilot on the VM, use a seed that will not be
@@ -197,3 +197,39 @@ python3 -m study.summarize_case5_diagnostics \
 Inspect raw completed errors before drawing a mechanism conclusion. For a
 generalization run, generate new base problems with a fresh private seed and
 freeze the prompt, limits, model revisions, and scoring rules before inference.
+
+### Assumption-instruction follow-up
+
+The final exploratory pilot adds one instruction against unstated assumptions
+to only three existing variants: omitted initial amount, complete problem, and
+net change with an unknown initial amount. It reuses the original item file,
+so there is no new generation step. Run one model at a time on the VM:
+
+```sh
+for model in qwen olmo; do
+  CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python \
+    -m study.run_case5_assumption_pilot "$model" \
+    --input /mnt/scmath-data/outputs/case5-diagnostics-pilot-items.jsonl \
+    --output "/mnt/scmath-data/outputs/${model}-case5-assumption-pilot.jsonl" || break
+done
+```
+
+Each file contains 30 fresh single-turn responses and records the complete
+system prompt. The runner pins each model to the revision in its saved baseline:
+Qwen `c1899de289a04d12100db370d81485cdf75e47ca` and OLMo
+`d97e442d7cc678210054dbcc9b440894d62c89a4`. The defaults remain 4,096
+generated tokens and an 8,192-token context. The runner refuses to overwrite
+an existing output. After copying
+the new files locally, compare each model with its original 90-row baseline:
+
+```sh
+python3 -m study.summarize_case5_assumption_pilot \
+  --baseline study/outputs/qwen-case5-diagnostics-pilot.jsonl \
+  --intervention study/outputs/qwen-case5-assumption-pilot.jsonl
+python3 -m study.summarize_case5_assumption_pilot \
+  --baseline study/olmo-case5-diagnostics-pilot.jsonl \
+  --intervention study/outputs/olmo-case5-assumption-pilot.jsonl
+```
+
+See [case5_diagnostics_spec.md](case5_diagnostics_spec.md) for the intervention
+wording and interpretation limits.

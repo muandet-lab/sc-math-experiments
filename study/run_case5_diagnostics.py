@@ -13,7 +13,7 @@ from study.generate_shortcut_cases import UNDETERMINED
 from study.run_shortcut_cases import (FINAL_MARKER, MODELS, PARSER_VERSION,
                                       parse_final_answer_detailed)
 
-SCORER_VERSION = 2
+SCORER_VERSION = 3
 SOLVE_SYSTEM = ("Solve carefully. End with one line beginning 'Final answer:' "
                 "followed by your actual result: a whole number, an expression "
                 "using x for an unknown quantity, or 'cannot be determined' as "
@@ -36,7 +36,8 @@ def _final_line(raw: str, finish_reason: str) -> tuple[str | None, str]:
 
 def _affine(expression: str) -> tuple[int, int] | None:
     """Return (x coefficient, constant) for a simple additive expression."""
-    expression = expression.strip().strip("$ ").replace("\\(", "").replace("\\)", "")
+    expression = (expression.strip().strip("*$ ").replace("\\(", "")
+                  .replace("\\)", "").strip())
     expression = re.sub(r"^\\boxed\{(.+)\}$", r"\1", expression)
     expression = re.sub(r"\s+(?:coins|cards|marbles|stickers|tokens)\.?$", "", expression)
     try:
@@ -106,12 +107,22 @@ def grade(row: dict, raw: str, finish_reason: str) -> dict:
 
 def run(model_key: str, input_path: Path, output: Path,
         max_tokens: int = 4096, max_model_len: int = 8192,
-        sampling_seed: int = 20260929) -> None:
+        sampling_seed: int = 20260929,
+        variants: tuple[str, ...] | None = None,
+        extra_system_instruction: str | None = None,
+        revision: str | None = None) -> None:
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite {output}")
     if max_tokens < 1 or max_model_len <= max_tokens:
         raise ValueError("max_model_len must exceed positive max_tokens")
     items = load_items(input_path)
+    if variants is not None:
+        if not variants or len(variants) != len(set(variants)):
+            raise ValueError("variants must be nonempty and unique")
+        if any(variant not in {item["variant"] for item in items}
+               for variant in variants):
+            raise ValueError("Unknown diagnostic variant")
+        items = [item for item in items if item["variant"] in variants]
 
     import torch
     import vllm
@@ -121,7 +132,7 @@ def run(model_key: str, input_path: Path, output: Path,
     if torch.cuda.device_count() < 1:
         raise RuntimeError("One visible CUDA GPU is required")
     repository = MODELS[model_key]
-    revision = HfApi().model_info(repository).sha
+    revision = revision or HfApi().model_info(repository).sha
     if not revision:
         raise RuntimeError(f"Could not resolve a revision for {repository}")
     template_kwargs = {"enable_thinking": True} if model_key == "qwen" else None
@@ -129,8 +140,9 @@ def run(model_key: str, input_path: Path, output: Path,
                 "max_tokens": max_tokens, "seed": sampling_seed}
     if model_key == "qwen":
         settings["top_k"] = 20
-    messages = [[{"role": "system", "content": SOLVE_SYSTEM if item["task"] == "solve"
-                  else ANSWERABILITY_SYSTEM},
+    messages = [[{"role": "system", "content":
+                  (SOLVE_SYSTEM if item["task"] == "solve" else ANSWERABILITY_SYSTEM)
+                  + (" " + extra_system_instruction if extra_system_instruction else "")},
                  {"role": "user", "content": item["problem"]}]
                 for item in items]
     engine = LLM(model=repository, revision=revision,
@@ -151,6 +163,7 @@ def run(model_key: str, input_path: Path, output: Path,
                       else "native-thinking", "vllm_version": vllm.__version__,
                       "torch_version": torch.__version__, "torch_cuda": torch.version.cuda,
                       "system_prompt": conversation[0]["content"],
+                      "extra_system_instruction": extra_system_instruction,
                       "chat_template_kwargs": template_kwargs,
                       "sampling": settings, "max_model_len": max_model_len,
                       "parser_version": PARSER_VERSION,

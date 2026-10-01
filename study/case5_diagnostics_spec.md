@@ -38,3 +38,24 @@ the model actually made that assumption. All raw responses and model/prompt
 settings are saved, so ambiguous or unparsed responses can be audited manually.
 These categories describe behavior; they do not establish a model's internal
 causal mechanism.
+
+## Assumption-instruction follow-up
+
+The final exploratory pilot reuses the same ten bases and only three existing
+solve variants: omitted initial amount, complete problem, and net change with
+an explicitly unknown initial amount. Each is sent in a fresh single-turn
+conversation with the same additional system instruction:
+
+> Use only the stated facts. Do not assign values to quantities whose values
+> are not given. If the requested quantity is not uniquely determined, state
+> that.
+
+The input questions, answer format, model settings, and sampling seed match the
+earlier pilot. Each model therefore produces 30 additional responses. Compare
+each response with the same base and variant in its saved baseline. Fewer
+unsupported numbers on omitted-start questions with intact control accuracy
+suggests a task-cue-correctable failure. Persisting guesses despite the
+instruction suggests a more robust shortcut. Incorrect abstention on complete
+or net-change controls indicates over-abstention. These outcomes cannot by
+themselves establish the internal cause or training origin. One sampled
+response per condition makes this an exploratory pilot.

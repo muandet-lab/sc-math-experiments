@@ -10,7 +10,9 @@ from unittest.mock import patch
 
 from study.generate_case5_diagnostics import VARIANTS, generate, validate_items
 from study.generate_shortcut_cases import UNDETERMINED
+from study.run_case5_assumption_pilot import INSTRUCTION, VARIANTS as ASSUMPTION_VARIANTS
 from study.run_case5_diagnostics import _affine, grade, run
+from study.summarize_case5_assumption_pilot import summarize as summarize_assumption
 from study.summarize_case5_diagnostics import summarize
 
 
@@ -49,6 +51,10 @@ class Case5DiagnosticTests(unittest.TestCase):
             (missing, "Final answer: cannot be determined", "correct_underdetermined"),
             (missing, f"Final answer: x + {delta}",
              "correct_symbolic_underdetermined"),
+            (missing, f"Final answer: ** x + {delta}",
+             "correct_symbolic_underdetermined"),
+            (missing, f"Final answer: \\( x + {delta} \\)",
+             "correct_symbolic_underdetermined"),
             (missing, "Final answer: 1", "unsupported_numeric"),
             (missing, "Final answer: If she started at zero, then 1",
              "conditional_answer"),
@@ -83,7 +89,9 @@ class Case5DiagnosticTests(unittest.TestCase):
                 seen["sampling"] = sampling
                 seen["template_kwargs"] = chat_template_kwargs
                 responses = []
-                for item in items:
+                for message in messages:
+                    item = next(item for item in items
+                                if item["problem"] == message[1]["content"])
                     answer = (item["answer"] if item["answer"] != UNDETERMINED
                               else "cannot be determined")
                     candidate = types.SimpleNamespace(
@@ -125,6 +133,24 @@ class Case5DiagnosticTests(unittest.TestCase):
                 with contextlib.redirect_stdout(printed):
                     summarize(output)
                 self.assertIn("missing_initial_solve: correct=1/1", printed.getvalue())
+                intervention_output = Path(directory) / "intervention.jsonl"
+                with contextlib.redirect_stdout(io.StringIO()):
+                    run("qwen", input_path, intervention_output,
+                        variants=ASSUMPTION_VARIANTS,
+                        extra_system_instruction=INSTRUCTION)
+                intervention = [json.loads(line) for line in
+                                intervention_output.read_text().splitlines()]
+                self.assertEqual([row["variant"] for row in intervention],
+                                 list(ASSUMPTION_VARIANTS))
+                self.assertTrue(all(row["system_prompt"].endswith(INSTRUCTION)
+                                    for row in intervention))
+                self.assertTrue(all(row["extra_system_instruction"] == INSTRUCTION
+                                    for row in intervention))
+                comparison = io.StringIO()
+                with contextlib.redirect_stdout(comparison):
+                    summarize_assumption(output, intervention_output)
+                self.assertIn("matched_bases=1", comparison.getvalue())
+                self.assertIn("omitted-start errors corrected", comparison.getvalue())
 
 
 if __name__ == "__main__":
