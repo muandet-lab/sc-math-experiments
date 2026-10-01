@@ -58,6 +58,14 @@ loading weights. It refuses to overwrite outputs. This is a functional pilot,
 not the pre-registered final study; its 20 matched renderings per model are
 insufficient for the planned hypothesis tests.
 
+The completed bf16 results and error traces are discussed in
+[gpu_pilot_report.md](gpu_pilot_report.md). After copying the three JSONL
+outputs to `study/outputs/` locally, recompute its table with:
+
+```sh
+python3 -m study.summarize_gpu_pilot
+```
+
 The full-study multi-comparison and dose-response generators, checkpoint
 manifest, bf16 generation runners, and human QA specified in the action plan
 remain pending. The step-format accuracy pilot and corpus classifier validation

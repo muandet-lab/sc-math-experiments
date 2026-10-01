@@ -7,6 +7,10 @@ disk, and a separate 1 TB balanced persistent disk. The latter is ext4,
 labelled `scmath-data`, mounted at `/mnt/scmath-data`, and listed in
 `/etc/fstab` by UUID.
 
+The bf16 pilot uses `/mnt/scmath-data/venvs/vllm-cu130`. vLLM's Triton and
+FlashInfer startup compilation on this VM required the Ubuntu packages
+`python3.12-dev`, `ninja-build`, and `build-essential` (including `g++`).
+
 Verify the VM from a local terminal:
 
 ```sh

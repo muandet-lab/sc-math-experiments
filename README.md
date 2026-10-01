@@ -20,11 +20,13 @@ repository root:
 ```sh
 python3 -m unittest study.test_generate study.test_local_pilot
 python3 -m study.summarize_local_pilot
+python3 -m study.summarize_gpu_pilot
 ```
 
 `study/outputs/`, `study/private/`, virtual environments, and model weights
-are local artifacts ignored by Git. The pilot report is in
-[`study/local_pilot_report.md`](study/local_pilot_report.md). The exploratory
+are local artifacts ignored by Git. The pilot reports are in
+[`study/local_pilot_report.md`](study/local_pilot_report.md) and
+[`study/gpu_pilot_report.md`](study/gpu_pilot_report.md). The exploratory
 bf16 VM pilot runner is `study.run_gpu_pilot`. The full-study multi-GPU runner
 and corpus-association measurement are still to be implemented; the Apple MLX
 pilot runner is not the VM runner.
