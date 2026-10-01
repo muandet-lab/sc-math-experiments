@@ -18,7 +18,7 @@ Run code checks and summarize the saved local exploratory pilot from the
 repository root:
 
 ```sh
-python3 -m unittest study.test_generate study.test_local_pilot
+python3 -m unittest study.test_generate study.test_local_pilot study.test_shortcut_cases
 python3 -m study.summarize_local_pilot
 python3 -m study.summarize_gpu_pilot
 ```
@@ -30,6 +30,11 @@ are local artifacts ignored by Git. The pilot reports are in
 bf16 VM pilot runner is `study.run_gpu_pilot`. The full-study multi-GPU runner
 and corpus-association measurement are still to be implemented; the Apple MLX
 pilot runner is not the VM runner.
+
+The five additional shortcut diagnostics (multiplicative reversal,
+comparison versus transfer, sentence order, missing-premise solvability, and
+changed-query template reuse) have matched-item generation and a thinking-only
+GPU runner documented in [study/README.md](study/README.md).
 
 ## Sync committed code to the VM
 

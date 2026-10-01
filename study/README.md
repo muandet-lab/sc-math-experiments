@@ -19,7 +19,8 @@ counts divisible by four give exact balance. All quantities stay between
 2 and 20. No model call or grammar correction is needed for these fixed
 templates.
 
-Run the local checks with `python3 -m unittest study.test_generate study.test_local_pilot`.
+Run the local checks with
+`python3 -m unittest study.test_generate study.test_local_pilot study.test_shortcut_cases`.
 
 An exploratory local pilot uses five base problems of at most three steps,
 each in verbal direct, verbal reversal, symbolic direct, and symbolic reversal
@@ -70,3 +71,67 @@ The full-study multi-comparison and dose-response generators, checkpoint
 manifest, bf16 generation runners, and human QA specified in the action plan
 remain pending. The step-format accuracy pilot and corpus classifier validation
 are also pending.
+
+## Additional shortcut cases (2–6)
+
+`study.generate_shortcut_cases` creates fresh matched pairs for the five
+diagnostics beyond additive keyword reversal. Its `--count` is the number of
+base pairs, so each output has twice that many prompts. These are controlled
+diagnostics, not the action plan's frozen primary evaluation set. See
+[shortcut_cases_spec.md](shortcut_cases_spec.md) for the manipulation and
+measurement rules and their limits.
+
+| Case | Control → challenge | Gold answer |
+| --- | --- | --- |
+| 2. Multiplicative reversal | Direct vs. reversed “times as many” or reciprocal relation | Same integer |
+| 3. Comparison vs. transfer | Target receives/gives away an amount vs. target has more/fewer than a source | Same integer |
+| 4. Sentence order | Two static comparisons in dependency order vs. the same facts reversed | Same integer |
+| 5. Solvability prior | Complete problem vs. initial numerical premise removed | Integer vs. “cannot be determined” |
+| 6. Solution template | Same facts, query target vs. query source | Different integers |
+
+For an exploratory smoke set on the VM, generate ten pairs per case with a
+seed that will **not** be reused for final evaluation. First sync the latest
+code to the VM, then run from its repository root:
+
+```sh
+for case in 2 3 4 5 6; do
+  /mnt/scmath-data/venvs/vllm-cu130/bin/python -m study.generate_shortcut_cases \
+    "$case" --count 10 --seed 20261001 \
+    --output "/mnt/scmath-data/outputs/shortcut-case${case}-items.jsonl" || break
+done
+```
+
+Run each input with either `qwen` (Qwen3-0.6B, `enable_thinking=True`) or `olmo`
+(OLMo 3 7B Think in its native thinking mode). The CLI has no non-thinking
+option. From the VM repository root, these commands run both models on all
+five cases, one process at a time:
+
+```sh
+export HF_HOME=/mnt/scmath-data/cache/huggingface
+for model in qwen olmo; do
+  for case in 2 3 4 5 6; do
+    CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python \
+      -m study.run_shortcut_cases "$model" \
+      --input "/mnt/scmath-data/outputs/shortcut-case${case}-items.jsonl" \
+      --output "/mnt/scmath-data/outputs/${model}-shortcut-case${case}-thinking.jsonl" || break 2
+  done
+done
+```
+
+The runner resolves and records the model revision, refuses to overwrite
+existing output, and saves every raw response. Default limits
+are 2,048 generated tokens and a 4,096-token context; use `--max-tokens` and
+`--max-model-len` together to pilot longer traces. Copy results locally and
+summarize one or more response files with:
+
+```sh
+python3 -m study.summarize_shortcut_cases study/outputs/*shortcut-case*-thinking.jsonl
+```
+
+The summary reports paired accuracy and, for case 5, numerical guessing on
+unsolvable questions; for case 6, whether a changed-query answer repeats the
+original answer. Case 3 necessarily changes how the known starting value is
+attached to the queried agent, so its gap is a comparison-versus-transfer
+diagnostic rather than a pure keyword effect. Human QA, larger pilot sizes,
+and checks for floor, ceiling, parsing, and truncation are required before
+inferential use.
