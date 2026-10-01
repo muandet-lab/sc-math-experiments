@@ -66,7 +66,7 @@ def summarize(baseline_path: Path, system_path: Path,
         cells.setdefault((row["variant"], placement), []).append(row)
     print(f"{stage1_path.name}: {model}, bases={len(bases)}, "
           f"scorer_version={SCORER_VERSION}")
-    print("condition | none correct/predicted/other | system | user")
+    print("condition | none correct/total/predicted/other | system | user")
     for variant in CONDITIONS:
         parts = []
         for placement in ("none", "system", "user"):

@@ -1,5 +1,12 @@
 # Keyword-consistency study setup
 
+The new locked Case 5 confirmatory setup is in
+[case5_confirmatory_preregistration.md](case5_confirmatory_preregistration.md),
+with VM commands in [case5_confirmatory_runbook.md](case5_confirmatory_runbook.md).
+It uses 36 fresh bases, eight pinned thinking checkpoints, a frozen scorer,
+and separate prefill/analysis/trace-coding workflows. No smoke or model run
+has been performed for this set.
+
 The separate upstream `solving-biases` checkout is pinned at
 `a7d858ff4129d3d5077bbbd0000c2796d3ce50bd`.
 Published upstream instances in `data/` are not used for evaluation.
@@ -272,3 +279,7 @@ python3 -m study.summarize_case5_instruction_stage1 \
 
 The next confirmatory study would rerun the final grid on fresh bases with
 multiple samples per prompt; do not pool it with this exploratory Stage 1.
+The local results and truncation audit are documented in
+[case5_instruction_stage1_report.md](case5_instruction_stage1_report.md).
+The 8,192-token OLMo truncation rerun and new pocket-plus-box baseline are
+documented in [case5_olmo_8192_followup_report.md](case5_olmo_8192_followup_report.md).

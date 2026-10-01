@@ -13,7 +13,7 @@ from study.generate_shortcut_cases import UNDETERMINED
 from study.run_shortcut_cases import (FINAL_MARKER, MODELS, PARSER_VERSION,
                                       parse_final_answer_detailed)
 
-SCORER_VERSION = 4
+SCORER_VERSION = 5
 SOLVE_SYSTEM = ("Solve carefully. End with one line beginning 'Final answer:' "
                 "followed by your actual result: a whole number, an expression "
                 "using x for an unknown quantity, or 'cannot be determined' as "
@@ -29,6 +29,9 @@ def _final_line(raw: str, finish_reason: str) -> tuple[str | None, str]:
     content = raw.rsplit("</think>", 1)[-1]
     matches = list(FINAL_MARKER.finditer(content))
     if not matches:
+        last_line = content.strip().splitlines()[-1].strip() if content.strip() else ""
+        if last_line.lower().rstrip(".") == "cannot be determined":
+            return last_line, "found_unmarked_final"
         return None, "missing_final"
     line = content[matches[-1].end():].lstrip("\r\n \t").split("\n", 1)[0].strip()
     return (line, "found_final") if line else (None, "invalid_final")

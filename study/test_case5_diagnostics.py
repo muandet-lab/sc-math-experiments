@@ -102,6 +102,7 @@ class Case5DiagnosticTests(unittest.TestCase):
                          (1, delta))
         cases = (
             (missing, "Final answer: cannot be determined", "correct_underdetermined"),
+            (missing, "cannot be determined", "correct_underdetermined"),
             (missing, f"Final answer: x + {delta}",
              "correct_symbolic_underdetermined"),
             (missing, f"Final answer: ** x + {delta}",
