@@ -18,18 +18,23 @@ MODELS = {"qwen": "Qwen/Qwen3-0.6B", "olmo": "allenai/Olmo-3-7B-Think"}
 SYSTEM = ("Solve the problem carefully. If a necessary quantity is missing, "
           "do not guess it. End with exactly one line: Final answer: <integer> "
           "or Final answer: cannot be determined.")
-FINAL_LINE = re.compile(r"(?im)^\s*(?:\*\*)?final\s+answer(?:\*\*)?\s*[:：]\s*(.+?)\s*$")
+FINAL_MARKER = re.compile(r"(?i)\bfinal\s+answer(?:\*\*)?\s*[:：]\s*")
 UNDETERMINED_PHRASE = re.compile(
     r"(?i)\b(?:cannot|can't|can not)\s+be\s+determined\b|"
     r"\b(?:not enough|insufficient)\s+information\b|\bunderdetermined\b"
 )
 
 
-def parse_final_answer(raw: str) -> int | str | None:
-    matches = FINAL_LINE.findall(raw)
+def parse_final_answer(raw: str, finish_reason: str | None = None) -> int | str | None:
+    if finish_reason == "length" and "</think>" not in raw:
+        return None
+    final_content = raw.rsplit("</think>", 1)[-1]
+    matches = list(FINAL_MARKER.finditer(final_content))
     if not matches:
         return None
-    final = matches[-1].replace("**", "").strip()
+    tail_lines = final_content[matches[-1].end():].splitlines()
+    final = (tail_lines[0] if tail_lines else "").replace("**", "").strip()
+    final = re.sub(r"(?i)^<integer>\s*", "", final)
     if UNDETERMINED_PHRASE.search(final):
         return UNDETERMINED
     return extract_answer("Final answer: " + final)
@@ -90,7 +95,7 @@ def run(model_key: str, input_path: Path, output: Path,
     with output.open("x", encoding="utf-8") as handle:
         for item, response in zip(items, responses):
             candidate = response.outputs[0]
-            parsed = parse_final_answer(candidate.text)
+            parsed = parse_final_answer(candidate.text, candidate.finish_reason)
             row = {**item, "model": repository, "revision": revision,
                    "precision": "bf16",
                    "mode": "thinking" if model_key == "qwen" else "native-thinking",

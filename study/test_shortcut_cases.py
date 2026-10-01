@@ -66,6 +66,17 @@ class AnswerParsingTests(unittest.TestCase):
                          UNDETERMINED)
         self.assertEqual(parse_final_answer("Final answer: insufficient information"),
                          UNDETERMINED)
+        self.assertEqual(parse_final_answer(
+            "</think> Maya has 16 coins. Final answer: 16"), 16)
+        self.assertEqual(parse_final_answer(
+            "<think>Final answer: cannot be determined</think> "
+            "The facts suffice. Final answer: 5"), 5)
+        self.assertEqual(parse_final_answer(
+            "</think> Final answer: <integer> 8"), 8)
+        self.assertIsNone(parse_final_answer(
+            "<think>Final answer: 8", finish_reason="length"))
+        self.assertIsNone(parse_final_answer(
+            "<think>Final answer: 8</think> Still explaining...", finish_reason="length"))
         self.assertIsNone(parse_final_answer("I think the answer is 7."))
         self.assertIsNone(parse_final_answer("Final answer: 7.5"))
 
@@ -76,6 +87,8 @@ class AnswerParsingTests(unittest.TestCase):
                        mode="thinking", finish_reason="stop")
         rows[0].update(parsed_answer=rows[0]["answer"], correct=True)
         rows[1].update(parsed_answer=rows[0]["answer"], correct=False)
+        for row in rows:
+            row["raw_response"] = f"</think> Final answer: {row['parsed_answer']}"
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "responses.jsonl"
             path.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
@@ -84,6 +97,24 @@ class AnswerParsingTests(unittest.TestCase):
                 summarize(path)
         self.assertIn("changed-query answers repeating original gold=1/1",
                       printed.getvalue())
+
+    def test_summary_regrades_saved_raw_responses_without_rewriting_file(self):
+        rows = generate(3, 1, 42)
+        for row in rows:
+            row.update(model="Qwen/Qwen3-0.6B", revision="example-revision",
+                       mode="thinking", finish_reason="stop",
+                       parsed_answer=None, correct=False,
+                       raw_response=f"</think> The result follows. Final answer: {row['answer']}")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "responses.jsonl"
+            original = "\n".join(json.dumps(row) for row in rows) + "\n"
+            path.write_text(original)
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                summarize(path)
+            self.assertEqual(path.read_text(), original)
+        self.assertIn("transfer: 1/1; comparison: 1/1", printed.getvalue())
+        self.assertIn("regraded_rows=2", printed.getvalue())
 
 
 class ThinkingRunnerTests(unittest.TestCase):

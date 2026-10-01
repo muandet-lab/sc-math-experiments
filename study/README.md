@@ -80,6 +80,8 @@ base pairs, so each output has twice that many prompts. These are controlled
 diagnostics, not the action plan's frozen primary evaluation set. See
 [shortcut_cases_spec.md](shortcut_cases_spec.md) for the manipulation and
 measurement rules and their limits.
+The completed thinking-mode pilot and its corrected scoring are discussed in
+[shortcut_cases_pilot_report.md](shortcut_cases_pilot_report.md).
 
 | Case | Control → challenge | Gold answer |
 | --- | --- | --- |

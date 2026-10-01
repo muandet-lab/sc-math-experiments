@@ -6,11 +6,17 @@ import argparse
 from pathlib import Path
 
 from study.generate_shortcut_cases import UNDETERMINED
-from study.run_shortcut_cases import load_items
+from study.run_shortcut_cases import load_items, parse_final_answer
 
 
 def summarize(path: Path) -> None:
     rows = load_items(path)
+    changed = 0
+    for row in rows:
+        parsed = parse_final_answer(row["raw_response"], row["finish_reason"])
+        correct = parsed == row["answer"]
+        changed += parsed != row["parsed_answer"] or correct != row["correct"]
+        row["parsed_answer"], row["correct"] = parsed, correct
     case = rows[0]["case"]
     if len({(row["model"], row["revision"], row["mode"]) for row in rows}) != 1:
         raise ValueError(f"Mixed model configurations in {path}")
@@ -23,8 +29,11 @@ def summarize(path: Path) -> None:
     print(f"{left[0]['variant']}: {left_correct}/{count}; "
           f"{right[0]['variant']}: {right_correct}/{count}; "
           f"gap={(left_correct - right_correct) / count:+.3f}")
-    print(f"parse_failures={sum(row['parsed_answer'] is None for row in rows)} "
-          f"truncations={sum(row['finish_reason'] == 'length' for row in rows)}")
+    for group in (left, right):
+        print(f"{group[0]['variant']} parse_failures="
+              f"{sum(row['parsed_answer'] is None for row in group)} "
+              f"truncations={sum(row['finish_reason'] == 'length' for row in group)}")
+    print(f"regraded_rows={changed}")
     if case in (2, 3):
         for operation in (("multiply", "divide") if case == 2 else
                           ("add", "subtract")):
