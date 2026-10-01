@@ -137,3 +137,23 @@ attached to the queried agent, so its gap is a comparison-versus-transfer
 diagnostic rather than a pure keyword effect. Human QA, larger pilot sizes,
 and checks for floor, ceiling, parsing, and truncation are required before
 inferential use.
+
+For the next **case-5-only pilot**, use new output filenames because the answer
+prompt has changed since the first pilot. A longer generation limit may reduce
+unfinished thinking traces; test GPU fit and runtime with one model at a time:
+
+```sh
+for model in qwen olmo; do
+  CUDA_VISIBLE_DEVICES=0 /mnt/scmath-data/venvs/vllm-cu130/bin/python \
+    -m study.run_shortcut_cases "$model" \
+    --input /mnt/scmath-data/outputs/shortcut-case5-items.jsonl \
+    --max-tokens 4096 --max-model-len 8192 \
+    --output "/mnt/scmath-data/outputs/${model}-shortcut-case5-format-v2.jsonl" || break
+done
+```
+
+The output records `parse_status` alongside the raw response and finish
+reason. After copying the files locally, run the summarizer on the new paths.
+It reports `unparsed_completed` separately from `truncations`; inspect those
+rows before interpreting the accuracy gap. The first and second pilots have
+different prompts and token limits and should be reported separately.

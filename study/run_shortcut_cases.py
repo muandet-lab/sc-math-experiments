@@ -12,32 +12,43 @@ import re
 from pathlib import Path
 
 from study.generate_shortcut_cases import CASES, UNDETERMINED, validate_pair
-from study.run_local_pilot import extract_answer
-
 MODELS = {"qwen": "Qwen/Qwen3-0.6B", "olmo": "allenai/Olmo-3-7B-Think"}
+PARSER_VERSION = 2
 SYSTEM = ("Solve the problem carefully. If a necessary quantity is missing, "
-          "do not guess it. End with exactly one line: Final answer: <integer> "
-          "or Final answer: cannot be determined.")
-FINAL_MARKER = re.compile(r"(?i)\bfinal\s+answer(?:\*\*)?\s*[:：]\s*")
+          "do not guess it. End with one line beginning 'Final answer:' followed "
+          "by either a whole number or the exact words 'cannot be determined'. "
+          "Write the actual answer, never a placeholder.")
+FINAL_MARKER = re.compile(r"(?i)\bfinal\s+answer(?:\*\*)?\s*[:：][ \t]*")
 UNDETERMINED_PHRASE = re.compile(
     r"(?i)\b(?:cannot|can't|can not)\s+be\s+determined\b|"
     r"\b(?:not enough|insufficient)\s+information\b|\bunderdetermined\b"
 )
+INTEGER = re.compile(r"(?<![\w.])[-+]?\d+(?!\w|\.\d)")
 
 
-def parse_final_answer(raw: str, finish_reason: str | None = None) -> int | str | None:
-    if finish_reason == "length" and "</think>" not in raw:
-        return None
+def parse_final_answer_detailed(raw: str, finish_reason: str | None = None
+                                ) -> tuple[int | str | None, str]:
+    if "</think>" not in raw and ("<think>" in raw or finish_reason is not None):
+        return None, "incomplete_thinking"
     final_content = raw.rsplit("</think>", 1)[-1]
     matches = list(FINAL_MARKER.finditer(final_content))
     if not matches:
-        return None
-    tail_lines = final_content[matches[-1].end():].splitlines()
-    final = (tail_lines[0] if tail_lines else "").replace("**", "").strip()
+        return None, "missing_final"
+    final = final_content[matches[-1].end():].split("\n", 1)[0].replace("**", "").strip()
     final = re.sub(r"(?i)^<integer>\s*", "", final)
-    if UNDETERMINED_PHRASE.search(final):
-        return UNDETERMINED
-    return extract_answer("Final answer: " + final)
+    numbers = INTEGER.findall(final)
+    abstains = bool(UNDETERMINED_PHRASE.search(final))
+    if abstains and numbers or len(numbers) > 1:
+        return None, "ambiguous_final"
+    if abstains:
+        return UNDETERMINED, "parsed_abstention"
+    if len(numbers) == 1:
+        return int(numbers[0]), "parsed_numeric"
+    return None, "invalid_final"
+
+
+def parse_final_answer(raw: str, finish_reason: str | None = None) -> int | str | None:
+    return parse_final_answer_detailed(raw, finish_reason)[0]
 
 
 def load_items(path: Path) -> list[dict]:
@@ -95,7 +106,8 @@ def run(model_key: str, input_path: Path, output: Path,
     with output.open("x", encoding="utf-8") as handle:
         for item, response in zip(items, responses):
             candidate = response.outputs[0]
-            parsed = parse_final_answer(candidate.text, candidate.finish_reason)
+            parsed, parse_status = parse_final_answer_detailed(
+                candidate.text, candidate.finish_reason)
             row = {**item, "model": repository, "revision": revision,
                    "precision": "bf16",
                    "mode": "thinking" if model_key == "qwen" else "native-thinking",
@@ -108,6 +120,7 @@ def run(model_key: str, input_path: Path, output: Path,
                    "prompt_tokens": len(response.prompt_token_ids),
                    "generation_tokens": len(candidate.token_ids),
                    "raw_response": candidate.text, "parsed_answer": parsed,
+                   "parse_status": parse_status, "parser_version": PARSER_VERSION,
                    "correct": parsed == item["answer"],
                    "finish_reason": candidate.finish_reason}
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")

@@ -9,7 +9,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from study.generate_shortcut_cases import CASES, UNDETERMINED, generate, validate_pair
-from study.run_shortcut_cases import load_items, parse_final_answer, run
+from study.run_shortcut_cases import (load_items, parse_final_answer,
+                                      parse_final_answer_detailed, run)
 from study.summarize_shortcut_cases import summarize
 
 
@@ -76,7 +77,25 @@ class AnswerParsingTests(unittest.TestCase):
         self.assertIsNone(parse_final_answer(
             "<think>Final answer: 8", finish_reason="length"))
         self.assertIsNone(parse_final_answer(
+            "<think>Final answer: 8", finish_reason="stop"))
+        self.assertEqual(parse_final_answer_detailed(
+            "Final answer: 8", finish_reason="stop"),
+            (None, "incomplete_thinking"))
+        self.assertIsNone(parse_final_answer(
             "<think>Final answer: 8</think> Still explaining...", finish_reason="length"))
+        self.assertEqual(parse_final_answer(
+            "<think>work</think> Final answer: $\\boxed{7}$"), 7)
+        self.assertEqual(parse_final_answer(
+            "</think> The result is 11. Final answer: 11."), 11)
+        self.assertEqual(parse_final_answer_detailed(
+            "<think>work</think> Final answer: <integer>"),
+            (None, "invalid_final"))
+        self.assertEqual(parse_final_answer_detailed(
+            "<think>work</think> Final answer: 3 or cannot be determined"),
+            (None, "ambiguous_final"))
+        self.assertEqual(parse_final_answer_detailed(
+            "<think>work</think> Final answer: 3 or 4"),
+            (None, "ambiguous_final"))
         self.assertIsNone(parse_final_answer("I think the answer is 7."))
         self.assertIsNone(parse_final_answer("Final answer: 7.5"))
 
@@ -162,7 +181,10 @@ class ThinkingRunnerTests(unittest.TestCase):
                     rows = [json.loads(line) for line in output.read_text().splitlines()]
                     self.assertEqual([row["correct"] for row in rows], [True, True])
                     self.assertEqual(rows[1]["parsed_answer"], UNDETERMINED)
+                    self.assertEqual(rows[1]["parse_status"], "parsed_abstention")
+                    self.assertEqual(rows[1]["parser_version"], 2)
                     self.assertTrue(all(row["mode"].endswith("thinking") for row in rows))
+                    self.assertNotIn("<integer>", seen["messages"][0][0]["content"])
                     self.assertEqual(seen["template_kwargs"],
                                      {"enable_thinking": True} if model == "qwen" else None)
 

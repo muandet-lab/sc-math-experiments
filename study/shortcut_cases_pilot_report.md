@@ -43,12 +43,15 @@ repeated the original-query gold answer in a changed-query response. Qwen did
 better on the changed query, while all five of OLMo's changed-query failures
 were truncations. The two queries can have different intrinsic difficulty.
 
-For a follow-up pilot, keep these files intact and use new output names. Raise
-the response and context limits together for cases 2, 5, and 6, then inspect
-completed wrong answers separately from parsing and truncation. Revise the
-prompt so it requests `Final answer: N` with an actual integer rather than a
-literal `<integer>` placeholder, and record that as a new prompt condition.
-Cases 3 and 4 need harder matched items before larger sample sizes help.
+For a follow-up pilot, keep these files intact and use new output names. The
+runner now asks for an actual whole number or the exact abstention phrase and
+forbids placeholders; this is a **new prompt condition** and its results should
+not be pooled with these files. The runner records a parse status for every
+answer, and the summarizer separates completed responses without a parseable
+final answer from token-limit truncations. Raise the response and context
+limits together for cases 2, 5, and 6, then inspect completed wrong answers
+separately from parsing and truncation. Cases 3 and 4 need harder matched
+items before larger sample sizes help.
 
 Reproduce the table and diagnostics locally with:
 
