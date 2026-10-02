@@ -49,8 +49,9 @@ def conversation(item: dict, task: str, placement: str) -> list[dict]:
 def run(model_key: str, items_path: Path, manifest_path: Path, output_path: Path,
         batch_size: int = 32, max_tokens: int = 16384,
         max_model_len: int = 20480, tensor_parallel_size: int = 1,
-        seed: int = 20261001) -> None:
-    if max_model_len <= max_tokens or batch_size < 1 or tensor_parallel_size < 1:
+        seed: int = 20261001, gpu_memory_utilization: float = 0.85) -> None:
+    if (max_model_len <= max_tokens or batch_size < 1 or tensor_parallel_size < 1
+            or not 0 < gpu_memory_utilization <= 1):
         raise ValueError("Invalid generation configuration")
     models = load_manifest(manifest_path)
     model = models[model_key]
@@ -93,7 +94,8 @@ def run(model_key: str, items_path: Path, manifest_path: Path, output_path: Path
     kwargs = {"enable_thinking": True} if model_key.startswith("qwen") else None
     engine = LLM(model=repository, revision=revision, tokenizer_revision=revision,
                  dtype="bfloat16", tensor_parallel_size=tensor_parallel_size,
-                 max_model_len=max_model_len, gpu_memory_utilization=0.85, seed=seed)
+                 max_model_len=max_model_len,
+                 gpu_memory_utilization=gpu_memory_utilization, seed=seed)
     settings = {"n": model["samples"], "temperature": 0.6, "top_p": 0.95,
                 "max_tokens": max_tokens, "seed": seed}
     if model_key.startswith("qwen"):
@@ -147,9 +149,11 @@ def main() -> None:
     parser.add_argument("--max-tokens", type=int, default=16384)
     parser.add_argument("--max-model-len", type=int, default=20480)
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     args = parser.parse_args()
     run(args.model, args.items, args.manifest, args.output, args.batch_size,
-        args.max_tokens, args.max_model_len, args.tensor_parallel_size)
+        args.max_tokens, args.max_model_len, args.tensor_parallel_size,
+        gpu_memory_utilization=args.gpu_memory_utilization)
 
 
 if __name__ == "__main__":
