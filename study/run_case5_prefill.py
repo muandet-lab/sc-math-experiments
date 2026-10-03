@@ -1,4 +1,4 @@
-"""Measure single-token 0 versus received-number continuation log probabilities."""
+"""Measure zero versus received-number continuation log probabilities."""
 
 from __future__ import annotations
 
@@ -9,6 +9,16 @@ from pathlib import Path
 
 from study.run_case5_confirmatory import load_manifest
 from study.run_case5_confirmatory import SYSTEM_SOLVE
+
+
+def score_continuation(engine, prefix_ids: list[int], candidate_ids: list[int], sampling_params) -> float:
+    response = engine.generate([{"prompt_token_ids": prefix_ids + candidate_ids}],
+                               sampling_params, use_tqdm=False)[0]
+    logprobs = response.prompt_logprobs
+    if logprobs is None or len(logprobs) != len(prefix_ids) + len(candidate_ids):
+        raise ValueError("Missing prompt log probabilities for probe continuation")
+    return sum(logprobs[position][token_id].logprob
+               for position, token_id in enumerate(candidate_ids, start=len(prefix_ids)))
 
 
 def run(model_key: str, probes_path: Path, manifest_path: Path,
@@ -32,7 +42,7 @@ def run(model_key: str, probes_path: Path, manifest_path: Path,
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("x", encoding="utf-8") as handle:
         for probe in probes:
-            # A fixed assistant thought prefix gives comparable forced-next-token
+            # A fixed assistant thought prefix gives comparable continuation
             # measurements in the models' native thinking chat templates.
             messages = [{"role": "system", "content": SYSTEM_SOLVE},
                         {"role": "user", "content": probe["problem"]}]
@@ -43,26 +53,20 @@ def run(model_key: str, probes_path: Path, manifest_path: Path,
             prefix = rendered + thought_start + probe["prefix"]
             zero_ids = tokenizer.encode(probe["zero_continuation"], add_special_tokens=False)
             recv_ids = tokenizer.encode(probe["received_continuation"], add_special_tokens=False)
-            if len(zero_ids) != 1 or len(recv_ids) != 1:
-                raise ValueError(f"Probe candidates are not single tokens: {probe['probe_id']}")
+            if not zero_ids or not recv_ids:
+                raise ValueError(f"Empty probe candidate: {probe['probe_id']}")
             prefix_ids = tokenizer.encode(prefix, add_special_tokens=False)
-            for continuation, token_id in ((probe["zero_continuation"], zero_ids[0]),
-                                           (probe["received_continuation"], recv_ids[0])):
-                if tokenizer.encode(prefix + continuation, add_special_tokens=False) != prefix_ids + [token_id]:
-                    raise ValueError(f"Candidate tokenization changes at prefix: {probe['probe_id']}")
             params = SamplingParams(max_tokens=1, temperature=0,
-                                    logprobs=2, logprob_token_ids=[zero_ids[0], recv_ids[0]])
-            response = engine.generate([prefix], params, use_tqdm=False)[0]
-            probabilities = response.outputs[0].logprobs[0]
-            zero = probabilities[zero_ids[0]].logprob
-            received = probabilities[recv_ids[0]].logprob
+                                    prompt_logprobs=0)
+            zero = score_continuation(engine, prefix_ids, zero_ids, params)
+            received = score_continuation(engine, prefix_ids, recv_ids, params)
             if not math.isfinite(zero) or not math.isfinite(received):
                 raise ValueError("Non-finite probe log probability")
             row = {**probe, "model_key": model_key, "model": model["repository"],
                    "revision": model["revision"], "vllm_version": vllm.__version__,
                    "torch_version": torch.__version__, "prompt": prefix,
                    "chat_template_kwargs": kwargs,
-                   "zero_token_id": zero_ids[0], "received_token_id": recv_ids[0],
+                   "zero_token_ids": zero_ids, "received_token_ids": recv_ids,
                    "logprob_zero": zero, "logprob_received": received,
                    "log_odds_zero_vs_received": zero - received,
                    "candidate_mass_zero": math.exp(zero),

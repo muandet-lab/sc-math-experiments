@@ -2,11 +2,13 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from study.generate_case5_confirmatory import COUNT, generate, validate
 from study.generate_shortcut_cases import UNDETERMINED
 from study.analyze_case5_confirmatory import analyze
 from study.run_case5_confirmatory import conversation, load_items, load_manifest
+from study.run_case5_prefill import score_continuation
 from study.score_case5_confirmatory import SCORER_VERSION, score
 
 
@@ -14,6 +16,18 @@ HERE = Path(__file__).parent
 
 
 class ConfirmatoryCase5Tests(unittest.TestCase):
+    def test_prefill_scores_all_continuation_tokens(self):
+        class Engine:
+            def generate(self, prompts, params, use_tqdm):
+                self.prompt = prompts[0]
+                return [SimpleNamespace(prompt_logprobs=[None, {2: SimpleNamespace(logprob=-0.5)},
+                                                          {3: SimpleNamespace(logprob=-1.0)},
+                                                          {4: SimpleNamespace(logprob=-2.0)}])]
+
+        engine = Engine()
+        self.assertEqual(score_continuation(engine, [1, 2], [3, 4], object()), -3.0)
+        self.assertEqual(engine.prompt, {"prompt_token_ids": [1, 2, 3, 4]})
+
     def test_frozen_grid_and_arithmetic(self):
         items, probes = generate()
         validate(items, probes)
