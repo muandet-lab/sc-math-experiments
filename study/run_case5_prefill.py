@@ -12,7 +12,8 @@ from study.run_case5_confirmatory import SYSTEM_SOLVE
 
 
 def run(model_key: str, probes_path: Path, manifest_path: Path,
-        output_path: Path, tensor_parallel_size: int = 1) -> None:
+        output_path: Path, tensor_parallel_size: int = 1,
+        gpu_memory_utilization: float = 0.85) -> None:
     if output_path.exists():
         raise FileExistsError(output_path)
     probes = [json.loads(line) for line in probes_path.read_text(encoding="utf-8").splitlines() if line]
@@ -26,7 +27,7 @@ def run(model_key: str, probes_path: Path, manifest_path: Path,
     engine = LLM(model=model["repository"], revision=model["revision"],
                  tokenizer_revision=model["revision"], dtype="bfloat16",
                  tensor_parallel_size=tensor_parallel_size, max_model_len=4096,
-                 gpu_memory_utilization=0.85, seed=20261001)
+                 gpu_memory_utilization=gpu_memory_utilization, seed=20261001)
     tokenizer = engine.get_tokenizer()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("x", encoding="utf-8") as handle:
@@ -78,8 +79,10 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--manifest", type=Path, default=Path(__file__).with_name("case5_confirmatory_models.json"))
     parser.add_argument("--tensor-parallel-size", type=int, default=1)
+    parser.add_argument("--gpu-memory-utilization", type=float, default=0.85)
     args = parser.parse_args()
-    run(args.model, args.probes, args.manifest, args.output, args.tensor_parallel_size)
+    run(args.model, args.probes, args.manifest, args.output,
+        args.tensor_parallel_size, args.gpu_memory_utilization)
 
 
 if __name__ == "__main__":
