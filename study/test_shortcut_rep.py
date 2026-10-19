@@ -112,6 +112,21 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(score(item, "Final answer: 1,200", "stop", "non_thinking")["outcome"],
                          "correct")
 
+    def test_boxed_fallback_only_when_no_final_line_parses(self):
+        result = score(self.item, "</think>Thus Iris has \\(\\boxed{8}\\).", "stop", "thinking")
+        self.assertEqual((result["outcome"], result["parse_source"]), ("correct", "boxed"))
+        self.assertEqual(score(self.item, "</think>The final answer is:\n\\[\n\\boxed{2}\n\\]",
+                               "stop", "thinking")["outcome"], "signature")
+        self.assertEqual(score(self.item, "</think>Final answer: \\(\\boxed{8}\\)", "stop",
+                               "thinking")["outcome"], "correct")
+        self.assertEqual(score(self.item, "</think>\\boxed{2} so Final answer: 8", "stop",
+                               "thinking")["outcome"], "correct")
+        self.assertEqual(score(self.item, "<think>\\boxed{8}", "stop", "thinking")["outcome"],
+                         "unparseable")
+        letter = {"answer_type": "letter", "gold": "C", "signature": None}
+        self.assertEqual(score(letter, "The answer is \\boxed{C}", "stop",
+                               "non_thinking")["chosen_index"], 2)
+
     def test_choice_outcomes(self):
         letter = {"answer_type": "letter", "gold": "C", "signature": None}
         result = score(letter, "Final answer: C. 7", "stop", "non_thinking")

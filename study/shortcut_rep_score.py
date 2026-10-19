@@ -1,4 +1,9 @@
-"""Frozen Phase 1 shortcut-replication scorer, version 1. Do not edit after model runs."""
+"""Frozen Phase 1 shortcut-replication scorer, version 2. Do not edit after model runs.
+
+Version 2 adds one fallback to version 1: when no final-answer line parses, the last
+``\\boxed{...}`` after the thinking block is used. Every response that version 1
+parsed keeps its outcome. Case 5 items still use the frozen Case 5 scorer unchanged.
+"""
 
 from __future__ import annotations
 
@@ -11,31 +16,43 @@ from pathlib import Path
 from study.score_case5_confirmatory import score as score_case5
 from study.shortcut_rep_items import load_family
 
-SCORER_VERSION = "shortcut-rep-v1"
+SCORER_VERSION = "shortcut-rep-v2"
 FINAL = re.compile(r"(?i)\bfinal\s+answer(?:\*\*)?\s*[:：]\s*")
 INTEGER = re.compile(r"(?:[A-Za-z' ]+=\s*)?([+-]?\d{1,3}(?:,\d{3})+|[+-]?\d+)(?:\s+[A-Za-z]+)?\.?")
+BOXED = re.compile(r"\\boxed\{((?:[^{}]|\{[^{}]*\})*)\}")
 LETTER = re.compile(r"(?:option\s+)?\(?([A-D])\)?(?:[.):]?(?:\s.*)?)?", re.I)
 
 
 def _strip(line: str) -> str:
     line = line.replace("**", "").strip().strip("$ ").strip()
+    line = re.sub(r"^\\[(\[](.*?)\\[)\]]\.?$", r"\1", line).strip()
     line = re.sub(r"^\\boxed\{(.*)\}\.?$", r"\1", line).strip()
     return re.sub(r"^\\text\{(.*)\}$", r"\1", line).strip()
 
 
+def _answer_text(raw: str, mode: str) -> str | None:
+    """Return the text after any thinking block, or None if thinking never closed."""
+    if "</think>" in raw:
+        return raw.rsplit("</think>", 1)[-1]
+    return None if mode == "thinking" else raw
+
+
 def _final_line(raw: str, mode: str) -> str | None:
     """Return the text after the last final-answer marker outside any thinking block."""
-    if "</think>" in raw:
-        content = raw.rsplit("</think>", 1)[-1]
-    elif mode == "thinking":
+    content = _answer_text(raw, mode)
+    if content is None:
         return None
-    else:
-        content = raw
     matches = list(FINAL.finditer(content))
     if not matches:
         return None
     line = _strip(content[matches[-1].end():].split("\n", 1)[0])
     return line or None
+
+
+def _last_boxed(raw: str, mode: str) -> str | None:
+    content = _answer_text(raw, mode)
+    boxes = BOXED.findall(content) if content is not None else []
+    return _strip(boxes[-1]) or None if boxes else None
 
 
 def score(item: dict, raw: str, finish_reason: str | None, mode: str) -> dict:
@@ -48,7 +65,15 @@ def score(item: dict, raw: str, finish_reason: str | None, mode: str) -> dict:
         result = score_case5(item["case5"], "solve", text, finish_reason)
         outcome = "signature" if result["outcome"] == "zero_default" else result["outcome"]
         return {**result, "outcome": outcome}
-    line = _final_line(raw, mode)
+    result = _parse(item, _final_line(raw, mode))
+    if result["outcome"] == "unparseable":
+        result = _parse(item, _last_boxed(raw, mode))
+        if result["outcome"] != "unparseable":
+            result["parse_source"] = "boxed"
+    return result
+
+
+def _parse(item: dict, line: str | None) -> dict:
     if line is None:
         return {"outcome": "unparseable", "parsed": None, "correct": False}
     if item["answer_type"] == "letter":
