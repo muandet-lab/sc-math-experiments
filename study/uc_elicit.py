@@ -17,7 +17,7 @@ from study.run_case5_confirmatory import SYSTEM_CHECK, SYSTEM_SOLVE
 from study.score_case5_confirmatory import ABSTAIN, FINAL, _affine
 from study.uc_items import GRID, GRID_MAX, TAIL
 
-PARSER_VERSION = "uc-v1"
+PARSER_VERSION = "uc-v2"
 TASKS = ("T0", "T1", "T2", "T3", "T4")
 FORMATS = ("probint", "pos")
 ARMS = ("direct", "two_stage")
@@ -81,11 +81,16 @@ def direct_messages(problem: dict, fmt: str) -> list[dict]:
     return [{"role": "user", "content": f"{problem['facts']} {problem['question']}\n\n{ELICIT[fmt]}"}]
 
 
+# The task's system prompt asks for a number; without this the two instructions conflict.
+OVERRIDE = ("For this request only, ignore the earlier instruction about the final answer "
+            "format and follow the format below.")
+
+
 def two_stage_messages(problem: dict, task: str, answer: str, fmt: str,
                        system_in_user: bool = False) -> list[dict]:
     return [*task_messages(problem, task, system_in_user),
             {"role": "assistant", "content": answer},
-            {"role": "user", "content": ELICIT[fmt]}]
+            {"role": "user", "content": f"{OVERRIDE}\n\n{ELICIT[fmt]}"}]
 
 
 def visible(raw: str, mode: str) -> str | None:
@@ -200,7 +205,10 @@ def parse_profile(fmt: str, raw: str, finish_reason: str | None, mode: str) -> d
     if text is None:
         return {"valid": False, "error": "no_closed_thinking"}
     matches = list(FINAL.finditer(text))
-    obj = _json_object(text[matches[-1].end():] if matches else text)
+    obj = _json_object(text[matches[-1].end():]) if matches else None
+    if obj is None:  # e.g. the JSON comes before a trailing "Final answer: 5"
+        blocks = [m.start() for m in re.finditer(r"\{", text)]
+        obj = next((o for o in (_json_object(text[i:]) for i in reversed(blocks)) if o), None)
     if obj is None:
         return {"valid": False, "error": "no_json"}
     zero = [0.0, 0.0] if fmt == "probint" else 0.0

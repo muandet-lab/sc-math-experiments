@@ -3,7 +3,8 @@ import random
 import unittest
 
 from study.generate_case5_confirmatory import generate as generate_case5
-from study.uc_elicit import classify_answer, parse_profile, task_messages, two_stage_messages
+from study.uc_elicit import (classify_answer, direct_messages, parse_profile, task_messages,
+                             two_stage_messages)
 from study.uc_items import GRID, TAIL, build, case5_bases
 from study.uc_measures import (cdf_bounds_intervals, cdf_bounds_possibility, mmi_bound_intervals,
                                mmi_intervals, mmi_possibility, reachable, summarize,
@@ -116,6 +117,8 @@ class ElicitTests(unittest.TestCase):
         self.assertFalse(parse_profile("pos", '{"5": 1.0}', "stop", "thinking")["valid"])
         self.assertTrue(parse_profile("pos", 'Final answer: {"5-50": 1, "more than 50": 1}', "stop",
                                       "non_thinking")["valid"])
+        before = parse_profile("pos", 'Here: {"5": 1.0, "6-50": 0.5}\n\nFinal answer: 5', "stop", "non_thinking")
+        self.assertEqual((before["valid"], before["profile"]["9"]), (True, 0.5))
         nested = parse_profile("pos", 'Final answer: {"14-17": {"14": 0.8, "17": 0.5}}', "stop", "non_thinking")
         self.assertEqual((nested["profile"]["14"], nested["profile"]["15"]), (0.8, 0.0))
         self.assertEqual(parse_profile("pos", 'Final answer: {"answer": "5"}', "stop", "non_thinking")["error"],
@@ -143,6 +146,8 @@ class ElicitTests(unittest.TestCase):
         self.assertEqual([m["role"] for m in merged], ["user"])
         convo = two_stage_messages(self.problem, "T1", "Final answer: 5", "pos")
         self.assertEqual([m["role"] for m in convo], ["system", "user", "assistant", "user"])
+        self.assertTrue(convo[-1]["content"].startswith("For this request only, ignore"))
+        self.assertNotIn("ignore the earlier", direct_messages(self.problem, "pos")[0]["content"])
         with self.assertRaises(ValueError):
             plan([self.problem], ["T4"], ["two_stage"], ["pos"])
 
